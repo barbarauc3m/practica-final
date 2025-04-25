@@ -4,3 +4,26 @@ servidor web + cliente python modifica el fichero para que cada vez q enviemos c
 tmb servidor (cliente de servidor rpc), donde queramos, que va imprimiendo
 
 declarar variable entorno
+
+
+OPERACIONES A HACER:
+
+Gestión de usuarios:
+    REGISTER: Registrar nuevo usuario
+
+    UNREGISTER: Eliminar usuario
+
+    CONNECT: Conectarse al sistema (indica IP/puerto)
+
+    DISCONNECT: Desconectarse
+
+Gestión de archivos:
+    PUBLISH: Publicar nombre de archivo (no el contenido)
+
+    DELETE: Eliminar archivo publicado
+
+    LIST_USERS: Listar usuarios conectados
+
+    LIST_CONTENT: Listar archivos de un usuario
+
+    GET_FILE: Descargar archivo de otro cliente (transferencia directa P2P)

@@ -22,6 +22,9 @@ gcc servidor.c -o servidor -lpthread
 
 typedef struct User {
     char name[MAX_NAME_LEN];
+    int is_connected;
+    char ip[INET_ADDRSTRLEN];
+    int port;
     struct User* next;
 } User;
 
@@ -84,6 +87,32 @@ int unregister_user(const char* name) {
     return 1; // Usuario no encontrado
 }
 
+int connect_user(const char* name, const char* ip, int port) {
+    pthread_mutex_lock(&user_mutex);
+
+    User* current = user_list;
+    while (current != NULL) {
+        if (strcmp(current->name, name) == 0) {
+            if (current->is_connected) {
+                pthread_mutex_unlock(&user_mutex);
+                return 2; // Ya conectado
+            }
+
+            current->is_connected = 1;
+            strncpy(current->ip, ip, INET_ADDRSTRLEN);
+            current->port = port;
+
+            pthread_mutex_unlock(&user_mutex);
+            return 0; // OK
+        }
+        current = current->next;
+    }
+
+    pthread_mutex_unlock(&user_mutex);
+    return 1; // Usuario no existe
+}
+
+
 // ----------------------------
 // Manejo de clientes
 // ----------------------------
@@ -105,35 +134,50 @@ void* client_handler(void* arg) {
     char* op = buffer;
     char* user = strchr(op, '\0') + 1;
 
-    // Verificación
+    // Verificación del formato básico
     if (user >= buffer + len) {
         printf("s> Invalid message format\n");
-        char code = 2;
-        send(client_sock, &code, 1, 0);
+        char resultado = 2;
+        send(client_sock, &resultado, 1, 0);
         close(client_sock);
         return NULL;
     }
 
-    //printf("s> RAW DATA: op='%s' user='%s'\n", op, user);
-
-    char code = 2; // Error por defecto
+    char resultado = 2; // Valor por defecto: error
 
     if (strcmp(op, "REGISTER") == 0) {
-        code = (char)register_user(user);
-        //printf("s> OPERATION REGISTER FROM %s\n", user);
+        resultado = (char)register_user(user);
+        printf("s> OPERATION REGISTER FROM %s\n", user);
 
     } else if (strcmp(op, "UNREGISTER") == 0) {
-        code = (char)unregister_user(user);
-        //printf("s> OPERATION UNREGISTER FROM %s\n", user);
+        resultado = (char)unregister_user(user);
+        printf("s> OPERATION UNREGISTER FROM %s\n", user);
 
-    } else {
-        printf("s> UNKNOWN OPERATION '%s'\n", op);
+    } else if (strcmp(op, "CONNECT") == 0) {
+        char* port_str = strchr(user, '\0') + 1;
+        if (port_str >= buffer + len) {
+            resultado = 3;
+        } else {
+            int client_port = atoi(port_str);
+
+            struct sockaddr_in addr;
+            socklen_t addr_len = sizeof(addr);
+            getpeername(client_sock, (struct sockaddr*)&addr, &addr_len);
+
+            char client_ip[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &addr.sin_addr, client_ip, INET_ADDRSTRLEN);
+
+            resultado = (char)connect_user(user, client_ip, client_port);
+            printf("s> OPERATION CONNECT FROM %s (%s:%d)\n", user, client_ip, client_port);
+        }
     }
 
-    send(client_sock, &code, 1, 0);
+    // Enviar respuesta y cerrar
+    send(client_sock, &resultado, 1, 0);
     close(client_sock);
     return NULL;
 }
+
 
 
 // ----------------------------

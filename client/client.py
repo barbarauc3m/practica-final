@@ -77,9 +77,53 @@ class client :
 
     
     @staticmethod
-    def  connect(user) :
-        #  Write your code here
-        return client.RC.ERROR
+    def connect(user):
+        try:
+            # 1. Crear socket de escucha (servidor) en un puerto libre
+            listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            listen_socket.bind(('', 0))  # El sistema elige un puerto libre
+            listen_socket.listen(5)
+            client._listen_socket = listen_socket
+            client._listen_port = listen_socket.getsockname()[1]
+            client._current_user = user
+
+            # 2. Crear el hilo que escuchará peticiones (se implementará más adelante)
+            def listen():
+                while client._running:
+                    try:
+                        conn, addr = listen_socket.accept()
+                        # Aquí en el futuro se atenderán GET_FILE
+                        conn.close()
+                    except:
+                        break
+
+            client._listen_thread = threading.Thread(target=listen, daemon=True)
+            client._listen_thread.start()
+
+            # 3. Conectar con el servidor
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((client._server, client._port))
+                s.sendall(b"CONNECT\0" + user.encode() + b"\0" + str(client._listen_port).encode() + b"\0")
+                response = s.recv(1)
+
+            # 4. Interpretar respuesta
+            if response == b'\x00':
+                print("c> CONNECT OK")
+                return client.RC.OK
+            elif response == b'\x01':
+                print("c> CONNECT FAIL, USER DOES NOT EXIST")
+                return client.RC.USER_ERROR
+            elif response == b'\x02':
+                print("c> USER ALREADY CONNECTED")
+                return client.RC.USER_ERROR
+            else:
+                print("c> CONNECT FAIL")
+                return client.RC.ERROR
+
+        except Exception as e:
+            print("c> CONNECT FAIL")
+            return client.RC.ERROR
+
 
 
     
