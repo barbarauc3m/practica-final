@@ -1,5 +1,5 @@
 /*
-gcc -o servidor servidor.c -lpthread
+gcc servidor.c -o servidor -lpthread
 ./servidor -p 5000
 */
 
@@ -59,6 +59,31 @@ int register_user(const char* name) {
     return 0; // OK
 }
 
+int unregister_user(const char* name) {
+    pthread_mutex_lock(&user_mutex);
+
+    User* current = user_list;
+    User* previous = NULL;
+
+    while (current != NULL) {
+        if (strcmp(current->name, name) == 0) {
+            if (previous == NULL) {
+                user_list = current->next;
+            } else {
+                previous->next = current->next;
+            }
+            free(current);
+            pthread_mutex_unlock(&user_mutex);
+            return 0; // OK
+        }
+        previous = current;
+        current = current->next;
+    }
+
+    pthread_mutex_unlock(&user_mutex);
+    return 1; // Usuario no encontrado
+}
+
 // ----------------------------
 // Manejo de clientes
 // ----------------------------
@@ -76,23 +101,40 @@ void* client_handler(void* arg) {
 
     buffer[len] = '\0';
 
-    // Parsear operación
+    // Parsear operación y usuario
     char* op = buffer;
     char* user = strchr(op, '\0') + 1;
 
-    if (strcmp(op, "REGISTER") == 0) {
-        int result = register_user(user);
-        char code = (char)result;
-        send(client_sock, &code, 1, 0);
-        printf("s> OPERATION REGISTER FROM %s\n", user);
-    } else {
+    // Verificación
+    if (user >= buffer + len) {
+        printf("s> Invalid message format\n");
         char code = 2;
         send(client_sock, &code, 1, 0);
+        close(client_sock);
+        return NULL;
     }
 
+    //printf("s> RAW DATA: op='%s' user='%s'\n", op, user);
+
+    char code = 2; // Error por defecto
+
+    if (strcmp(op, "REGISTER") == 0) {
+        code = (char)register_user(user);
+        //printf("s> OPERATION REGISTER FROM %s\n", user);
+
+    } else if (strcmp(op, "UNREGISTER") == 0) {
+        code = (char)unregister_user(user);
+        //printf("s> OPERATION UNREGISTER FROM %s\n", user);
+
+    } else {
+        printf("s> UNKNOWN OPERATION '%s'\n", op);
+    }
+
+    send(client_sock, &code, 1, 0);
     close(client_sock);
     return NULL;
 }
+
 
 // ----------------------------
 // Main
