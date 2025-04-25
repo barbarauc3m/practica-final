@@ -1,0 +1,6 @@
+servidor web + cliente python modifica el fichero para que cada vez q enviemos codigo de operacion, se envie cad de caracteres con username, op, fecha, hora
+
+
+tmb servidor (cliente de servidor rpc), donde queramos, que va imprimiendo
+
+declarar variable entorno
