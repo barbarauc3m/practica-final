@@ -54,13 +54,19 @@ int register_user(const char* name) {
         pthread_mutex_unlock(&user_mutex);
         return 2; // Error
     }
+
+    // INICIALIZAMOS BIEN TODOS LOS CAMPOS
     strncpy(new_user->name, name, MAX_NAME_LEN);
+    new_user->is_connected = 0;
+    new_user->ip[0] = '\0';
+    new_user->port = 0;
     new_user->next = user_list;
     user_list = new_user;
 
     pthread_mutex_unlock(&user_mutex);
     return 0; // OK
 }
+
 
 int unregister_user(const char* name) {
     pthread_mutex_lock(&user_mutex);
@@ -92,7 +98,7 @@ int connect_user(const char* name, const char* ip, int port) {
 
     User* current = user_list;
     while (current != NULL) {
-        if (strcmp(current->name, name) == 0) {
+        if (strcmp(current->name, name) == 0) {  // Si el usuario está registrado...
             if (current->is_connected) {
                 pthread_mutex_unlock(&user_mutex);
                 return 2; // Ya conectado
@@ -111,6 +117,32 @@ int connect_user(const char* name, const char* ip, int port) {
     pthread_mutex_unlock(&user_mutex);
     return 1; // Usuario no existe
 }
+
+int disconnect_user(const char* name) {
+    pthread_mutex_lock(&user_mutex);
+
+    User* current = user_list;
+    while (current != NULL) {
+        if (strcmp(current->name, name) == 0) {
+            if (!current->is_connected) {
+                pthread_mutex_unlock(&user_mutex);
+                return 2; // Usuario no está conectado
+            }
+
+            current->is_connected = 0;
+            current->ip[0] = '\0';
+            current->port = 0;
+
+            pthread_mutex_unlock(&user_mutex);
+            return 0; // OK
+        }
+        current = current->next;
+    }
+
+    pthread_mutex_unlock(&user_mutex);
+    return 1; // Usuario no existe
+}
+
 
 
 // ----------------------------
@@ -145,6 +177,7 @@ void* client_handler(void* arg) {
 
     char resultado = 2; // Valor por defecto: error
 
+    printf("s> op='%s' | user='%s'\n", op, user);
     if (strcmp(op, "REGISTER") == 0) {
         resultado = (char)register_user(user);
         printf("s> OPERATION REGISTER FROM %s\n", user);
@@ -152,6 +185,10 @@ void* client_handler(void* arg) {
     } else if (strcmp(op, "UNREGISTER") == 0) {
         resultado = (char)unregister_user(user);
         printf("s> OPERATION UNREGISTER FROM %s\n", user);
+
+    } else if (strcmp(op, "DISCONNECT") == 0) {
+        resultado = (char)disconnect_user(user);
+        printf("s> OPERATION DISCONNECT FROM %s\n", user);
 
     } else if (strcmp(op, "CONNECT") == 0) {
         char* port_str = strchr(user, '\0') + 1;
@@ -170,6 +207,10 @@ void* client_handler(void* arg) {
             resultado = (char)connect_user(user, client_ip, client_port);
             printf("s> OPERATION CONNECT FROM %s (%s:%d)\n", user, client_ip, client_port);
         }
+
+    } else {
+        printf("s> UNKNOWN OPERATION: %s\n", op);
+        resultado = 3;
     }
 
     // Enviar respuesta y cerrar

@@ -103,8 +103,8 @@ class client :
             # 3. Conectar con el servidor
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((client._server, client._port))
-                s.sendall(b"CONNECT\0" + user.encode() + b"\0" + str(client._listen_port).encode() + b"\0")
-                response = s.recv(1)
+                s.sendall(b"CONNECT\0" + user.encode() + b"\0" + str(client._listen_port).encode()) # + b"\0")
+                response = s.recv(1) # Para recibir 1 byte (que es el resultado de la operación (0, 1, 2, 3))
 
             # 4. Interpretar respuesta
             if response == b'\x00':
@@ -128,9 +128,46 @@ class client :
 
     
     @staticmethod
-    def  disconnect(user) :
-        #  Write your code here
-        return client.RC.ERROR
+    def disconnect(user):
+        try:
+            # 1. Enviar mensaje al servidor
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((client._server, client._port))
+                s.sendall(b"DISCONNECT\0" + user.encode() + b"\0")
+                response = s.recv(1)
+
+            # 2. Interpretar respuesta del servidor
+            if response == b'\x00':
+                print("c> DISCONNECT OK")
+            elif response == b'\x01':
+                print("c> DISCONNECT FAIL, USER DOES NOT EXIST")
+                return client.RC.USER_ERROR
+            elif response == b'\x02':
+                print("c> DISCONNECT FAIL, USER NOT CONNECTED")
+                return client.RC.USER_ERROR
+            else:
+                print("c> DISCONNECT FAIL")
+                return client.RC.ERROR
+
+            # 3. Parar el hilo y cerrar el socket de escucha
+            client._running = False
+            if client._listen_socket:
+                try:
+                    client._listen_socket.close()
+                except:
+                    pass
+                client._listen_socket = None
+
+            client._listen_thread = None
+            client._listen_port = None
+            client._current_user = None
+
+            return client.RC.OK
+
+        except Exception as e:
+            print("c> DISCONNECT FAIL")
+            return client.RC.ERROR
+
 
     @staticmethod
     def  publish(fileName,  description) :
