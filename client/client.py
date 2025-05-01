@@ -204,9 +204,37 @@ class client :
 
 
     @staticmethod
-    def  delete(fileName) :
-        #  Write your code here
-        return client.RC.ERROR
+    def delete(fileName):
+        if client._current_user is None:
+            print("c> DELETE FAIL, NOT CONNECTED")
+            return client.RC.USER_ERROR
+
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((client._server, client._port))
+                s.sendall(b"DELETE\0" +
+                        client._current_user.encode() + b"\0" +
+                        fileName.encode() + b"\0")
+
+                response = s.recv(1)
+
+            if response == b'\x00':
+                print("c> DELETE OK")
+                return client.RC.OK
+            elif response == b'\x01':
+                print("c> DELETE FAIL, USER DOES NOT EXIST")
+            elif response == b'\x02':
+                print("c> DELETE FAIL, USER NOT CONNECTED")
+            elif response == b'\x03':
+                print("c> DELETE FAIL, FILE NOT FOUND")
+            else:
+                print("c> DELETE FAIL")
+            return client.RC.USER_ERROR
+
+        except Exception as e:
+            print("c> DELETE FAIL")
+            return client.RC.ERROR
+
 
     @staticmethod
     def  listusers() :

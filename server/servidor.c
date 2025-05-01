@@ -198,6 +198,45 @@ int publish_file(const char* username, const char* filename, const char* descrip
     return 1; // Usuario no existe
 }
 
+int delete_file(const char* username, const char* filename) {
+    pthread_mutex_lock(&user_mutex);
+
+    User* user = user_list;
+    while (user) {
+        if (strcmp(user->name, username) == 0) {
+            if (!user->is_connected) {
+                pthread_mutex_unlock(&user_mutex);
+                return 2; // No conectado
+            }
+
+            FileEntry* prev = NULL;
+            FileEntry* current = user->files;
+
+            while (current) {
+                if (strcmp(current->filename, filename) == 0) {
+                    if (prev == NULL) {
+                        user->files = current->next;
+                    } else {
+                        prev->next = current->next;
+                    }
+                    free(current);
+                    pthread_mutex_unlock(&user_mutex);
+                    return 0; // OK
+                }
+                prev = current;
+                current = current->next;
+            }
+
+            pthread_mutex_unlock(&user_mutex);
+            return 3; // Archivo no encontrado
+        }
+        user = user->next;
+    }
+
+    pthread_mutex_unlock(&user_mutex);
+    return 1; // Usuario no existe
+}
+
 
 // ----------------------------
 // Manejo de clientes
@@ -219,14 +258,6 @@ void* client_handler(void* arg) {
     // Parsear operación y usuario
     char* op = buffer;
     char* user = strchr(op, '\0') + 1;
-
-    // Debugging
-    /*
-    for (int i = 0; i < strlen(op); ++i) {
-        printf("%02X ", (unsigned char)op[i]);
-        }
-    printf("\n");*/
-
 
     // Verificación del formato básico
     if (user >= buffer + len) {
@@ -280,6 +311,16 @@ void* client_handler(void* arg) {
             resultado = (char)publish_file(user, filename, description);
             printf("s> OPERATION PUBLISH FROM %s: %s (%s)\n", user, filename, description);
         }
+        
+    } else if (strcmp(op, "DELETE") == 0) {
+    char* filename = strchr(user, '\0') + 1;
+
+    if (filename >= buffer + len) {
+        resultado = 4; // Mal formato
+    } else {
+        resultado = (char)delete_file(user, filename);
+        printf("s> OPERATION DELETE FROM %s: %s\n", user, filename);
+    }
 
     } else {
         printf("s> UNKNOWN OPERATION: %s\n", op);
