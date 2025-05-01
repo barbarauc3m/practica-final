@@ -20,11 +20,19 @@ gcc servidor.c -o servidor -lpthread
 #define MAX_NAME_LEN 256
 #define BUFFER_SIZE 1024
 
+typedef struct FileEntry {
+    char filename[256];
+    char description[256];
+    struct FileEntry* next;
+} FileEntry;
+
+
 typedef struct User {
     char name[MAX_NAME_LEN];
     int is_connected;
     char ip[INET_ADDRSTRLEN];
     int port;
+    FileEntry* files; // Nuevo campo (lista enlazada) para los archivos publicados por el usuario
     struct User* next;
 } User;
 
@@ -32,7 +40,7 @@ User* user_list = NULL;
 pthread_mutex_t user_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // ----------------------------
-// Función para agregar usuario
+// FUNCIONES PARA EL MANEJO DE USUARIOS (register, unregister, connect, disconnect)
 // ----------------------------
 
 int register_user(const char* name) {
@@ -143,6 +151,52 @@ int disconnect_user(const char* name) {
     return 1; // Usuario no existe
 }
 
+// ----------------------------
+// FUNCIONES PARA LA GESTIÓN DE ARCHIVOS (publish, delete, list_users, list_conect, get_file) <- aunque list_users igual va arriba
+// ----------------------------
+
+int publish_file(const char* username, const char* filename, const char* description) {
+    pthread_mutex_lock(&user_mutex);
+
+    User* user = user_list;
+    while (user) {
+        if (strcmp(user->name, username) == 0) {
+            if (!user->is_connected) {
+                pthread_mutex_unlock(&user_mutex);
+                return 2; // Usuario no conectado
+            }
+
+            // Verificar si ya publicó ese archivo
+            FileEntry* f = user->files;
+            while (f) {
+                if (strcmp(f->filename, filename) == 0) {
+                    pthread_mutex_unlock(&user_mutex);
+                    return 3; // Archivo ya publicado
+                }
+                f = f->next;
+            }
+
+            // Crear nuevo archivo
+            FileEntry* new_file = malloc(sizeof(FileEntry));
+            if (!new_file) {
+                pthread_mutex_unlock(&user_mutex);
+                return 4; // Error de memoria
+            }
+
+            strncpy(new_file->filename, filename, 256);
+            strncpy(new_file->description, description, 256);
+            new_file->next = user->files;
+            user->files = new_file;
+
+            pthread_mutex_unlock(&user_mutex);
+            return 0; // OK
+        }
+        user = user->next;
+    }
+
+    pthread_mutex_unlock(&user_mutex);
+    return 1; // Usuario no existe
+}
 
 
 // ----------------------------
@@ -165,6 +219,14 @@ void* client_handler(void* arg) {
     // Parsear operación y usuario
     char* op = buffer;
     char* user = strchr(op, '\0') + 1;
+
+    // Debugging
+    /*
+    for (int i = 0; i < strlen(op); ++i) {
+        printf("%02X ", (unsigned char)op[i]);
+        }
+    printf("\n");*/
+
 
     // Verificación del formato básico
     if (user >= buffer + len) {
@@ -206,6 +268,17 @@ void* client_handler(void* arg) {
 
             resultado = (char)connect_user(user, client_ip, client_port);
             printf("s> OPERATION CONNECT FROM %s (%s:%d)\n", user, client_ip, client_port);
+        }
+
+    } else if (strcmp(op, "PUBLISH") == 0) {
+        char* filename = strchr(user, '\0') + 1;
+        char* description = strchr(filename, '\0') + 1;
+
+        if (description >= buffer + len) {
+            resultado = 4;
+        } else {
+            resultado = (char)publish_file(user, filename, description);
+            printf("s> OPERATION PUBLISH FROM %s: %s (%s)\n", user, filename, description);
         }
 
     } else {

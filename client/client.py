@@ -170,9 +170,38 @@ class client :
 
 
     @staticmethod
-    def  publish(fileName,  description) :
-        #  Write your code here
-        return client.RC.ERROR
+    def publish(fileName, description):
+        if client._current_user is None:
+            print("c> PUBLISH FAIL, NOT CONNECTED")
+            return client.RC.USER_ERROR
+
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((client._server, client._port))
+                s.sendall(b"PUBLISH\0" +
+                        client._current_user.encode() + b"\0" +
+                        fileName.encode() + b"\0" +
+                        description.encode() + b"\0")
+
+                response = s.recv(1)
+
+            if response == b'\x00':
+                print("c> PUBLISH OK")
+                return client.RC.OK
+            elif response == b'\x01':
+                print("c> PUBLISH FAIL, USER DOES NOT EXIST")
+            elif response == b'\x02':
+                print("c> PUBLISH FAIL, USER NOT CONNECTED")
+            elif response == b'\x03':
+                print("c> PUBLISH FAIL, CONTENT ALREADY PUBLISHED")
+            else:
+                print("c> PUBLISH FAIL")
+            return client.RC.USER_ERROR
+
+        except Exception as e:
+            print("c> PUBLISH FAIL")
+            return client.RC.ERROR
+
 
     @staticmethod
     def  delete(fileName) :
