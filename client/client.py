@@ -241,7 +241,8 @@ class client :
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((client._server, client._port))
-                s.sendall(b"LIST_USERS\0")
+                s.sendall(b"LIST_USERS\0" + client._current_user.encode() + b"\0")  # Enviamos también el usuario, aunque no hacemos nada con él.
+                # s.sendall(b"LIST_USERS\0")
 
                 # Primero leemos el código de resultado
                 result = s.recv(1)
