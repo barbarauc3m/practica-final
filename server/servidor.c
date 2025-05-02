@@ -332,20 +332,69 @@ void* client_handler(void* arg) {
         }
 
     } else if (strcmp(op, "LIST_USERS") == 0) {
-        printf("s> OPERATION LIST_USERS\n");
-        char list_buffer[BUFFER_SIZE];
-        int size = list_connected_users(list_buffer, BUFFER_SIZE);
+        printf("s> OPERATION LIST_USERS FROM %s\n", user);
 
-        if (size < 0) {
-            char fail = 2;
-            send(client_sock, &fail, 1, 0);
-        } else {
-            char ok = 0;
-            send(client_sock, &ok, 1, 0);
-            send(client_sock, list_buffer, size, 0);
+        pthread_mutex_lock(&user_mutex);
+        User* requester = user_list;
+        int found = 0;
+        while (requester) {
+            if (strcmp(requester->name, user) == 0) {
+                found = 1;
+                break;
+            }
+            requester = requester->next;
         }
+
+        if (!found) {
+            pthread_mutex_unlock(&user_mutex);
+            char code = 1; // USER DOES NOT EXIST
+            send(client_sock, &code, 1, 0);
+            close(client_sock);
+            return NULL;
+        }
+
+        if (!requester->is_connected) {
+            pthread_mutex_unlock(&user_mutex);
+            char code = 2; // USER NOT CONNECTED
+            send(client_sock, &code, 1, 0);
+            close(client_sock);
+            return NULL;
+        }
+
+        // Contar usuarios conectados
+        int count = 0;
+        User* u = user_list;
+        while (u) {
+            if (u->is_connected) count++;
+            u = u->next;
+        }
+
+        // Enviar código de éxito
+        char ok = 0;
+        send(client_sock, &ok, 1, 0);
+
+        // Enviar número de usuarios como cadena con '\0'
+        char count_str[10];
+        snprintf(count_str, sizeof(count_str), "%d", count);
+        send(client_sock, count_str, strlen(count_str) + 1, 0);
+
+        // Enviar nombre, IP y puerto de cada usuario
+        u = user_list;
+        while (u) {
+            if (u->is_connected) {
+                send(client_sock, u->name, strlen(u->name) + 1, 0);
+                send(client_sock, u->ip, strlen(u->ip) + 1, 0);
+                char port_str[10];
+                snprintf(port_str, sizeof(port_str), "%d", u->port);
+                send(client_sock, port_str, strlen(port_str) + 1, 0);
+            }
+            u = u->next;
+        }
+
+        pthread_mutex_unlock(&user_mutex);
         close(client_sock);
         return NULL;
+
         
     } else if (strcmp(op, "PUBLISH") == 0) {
         char* filename = strchr(user, '\0') + 1;

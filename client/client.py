@@ -238,36 +238,54 @@ class client :
 
     @staticmethod
     def listusers():
+        if client._current_user is None:
+            print("c> LIST_USERS FAIL, NOT CONNECTED")
+            return client.RC.USER_ERROR
+
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((client._server, client._port))
-                s.sendall(b"LIST_USERS\0" + client._current_user.encode() + b"\0")  # Enviamos también el usuario, aunque no hacemos nada con él.
-                # s.sendall(b"LIST_USERS\0")
+                s.sendall(b"LIST_USERS\0" + client._current_user.encode() + b"\0")
 
-                # Primero leemos el código de resultado
                 result = s.recv(1)
-                if result != b'\x00':
+                if result == b'\x01':
+                    print("c> LIST_USERS FAIL, USER DOES NOT EXIST")
+                    return client.RC.USER_ERROR
+                elif result == b'\x02':
+                    print("c> LIST_USERS FAIL, USER NOT CONNECTED")
+                    return client.RC.USER_ERROR
+                elif result != b'\x00':
                     print("c> LIST_USERS FAIL")
                     return client.RC.ERROR
 
-                # Leer datos hasta encontrar doble \0 (por seguridad usamos BUFFER_SIZE)
+                # Leer el resto de la información (número y lista)
                 data = bytearray()
                 while True:
                     chunk = s.recv(1024)
                     if not chunk:
                         break
                     data += chunk
-                    if data[-2:] == b'\0\0':
-                        break
 
-                users = data[:-2].split(b'\0')  # Quitamos el doble \0 final
-                print("c> CONNECTED USERS:")
-                for user in users:
-                    print("   -", user.decode())
+                entries = data.split(b'\0')
+                if len(entries) < 1:
+                    print("c> LIST_USERS FAIL")
+                    return client.RC.ERROR
+
+                num_users = int(entries[0].decode())
+                print("c> LIST_USERS OK")
+                idx = 1
+                for _ in range(num_users):
+                    if idx + 2 >= len(entries):
+                        break
+                    name = entries[idx].decode()
+                    ip = entries[idx + 1].decode()
+                    port = entries[idx + 2].decode()
+                    print(f"     {name} {ip} {port}")
+                    idx += 3
 
                 return client.RC.OK
 
-        except Exception as e:
+        except Exception:
             print("c> LIST_USERS FAIL")
             return client.RC.ERROR
 
