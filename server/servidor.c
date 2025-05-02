@@ -267,6 +267,66 @@ int delete_file(const char* username, const char* filename) {
     return 1; // Usuario no existe
 }
 
+int list_user_files(const char* requester, const char* target, char* buffer, int max_len) {
+    pthread_mutex_lock(&user_mutex);
+
+    User* req = NULL;
+    User* tgt = NULL;
+    User* current = user_list;
+
+    while (current) {
+        if (strcmp(current->name, requester) == 0) req = current;
+        if (strcmp(current->name, target) == 0) tgt = current;
+        current = current->next;
+    }
+
+    if (!req) {
+        pthread_mutex_unlock(&user_mutex);
+        return 1; // Usuario que realiza la operación no existe
+    }
+
+    if (!req->is_connected) {
+        pthread_mutex_unlock(&user_mutex);
+        return 2; // Usuario no conectado
+    }
+
+    if (!tgt) {
+        pthread_mutex_unlock(&user_mutex);
+        return 3; // Usuario remoto no existe
+    }
+
+    // Contar archivos publicados
+    int count = 0;
+    FileEntry* f = tgt->files;
+    while (f) {
+        count++;
+        f = f->next;
+    }
+
+    int pos = snprintf(buffer, max_len, "%d", count);
+    buffer[pos++] = '\0';  // Añadimos manualmente el \0 que separa cadenas
+
+    if (pos < 0 || pos >= max_len) {
+        pthread_mutex_unlock(&user_mutex);
+        return 4;
+    }
+
+    f = tgt->files;
+    while (f) {
+        int len = strlen(f->filename) + 1;
+        if (pos + len >= max_len) {
+            pthread_mutex_unlock(&user_mutex);
+            return 4; // Error por falta de espacio
+        }
+        memcpy(buffer + pos, f->filename, len);
+        pos += len;
+        f = f->next;
+    }
+
+    pthread_mutex_unlock(&user_mutex);
+    return pos; // devuelve bytes escritos si éxito
+}
+
 
 // ----------------------------
 // Manejo de clientes
@@ -416,6 +476,31 @@ void* client_handler(void* arg) {
         resultado = (char)delete_file(user, filename);
         printf("s> OPERATION DELETE FROM %s: %s\n", user, filename);
     }
+
+    } else if (strcmp(op, "LIST_CONTENT") == 0) {
+        char* target_user = strchr(user, '\0') + 1;
+        if (target_user >= buffer + len) {
+            char code = 4;
+            send(client_sock, &code, 1, 0);
+            close(client_sock);
+            return NULL;
+        }
+
+        char list_buffer[BUFFER_SIZE];
+        int result = list_user_files(user, target_user, list_buffer, BUFFER_SIZE);
+
+        if (result >= 0) {
+            char ok = 0;
+            send(client_sock, &ok, 1, 0);
+            send(client_sock, list_buffer, result, 0);
+        } else {
+            char err_code = (char)result;
+            send(client_sock, &err_code, 1, 0);
+        }
+
+        close(client_sock);
+        return NULL;
+
 
     } else {
         printf("s> UNKNOWN OPERATION: %s\n", op);

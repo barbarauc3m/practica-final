@@ -291,9 +291,56 @@ class client :
 
 
     @staticmethod
-    def  listcontent(user) :
-        #  Write your code here
-        return client.RC.ERROR
+    def listcontent(user):
+        if client._current_user is None:
+            print("c> LIST_CONTENT FAIL, NOT CONNECTED")
+            return client.RC.USER_ERROR
+
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((client._server, client._port))
+                s.sendall(b"LIST_CONTENT\0" +
+                        client._current_user.encode() + b"\0" +
+                        user.encode() + b"\0")
+
+                result = s.recv(1)
+                if result == b'\x01':
+                    print("c> LIST_CONTENT FAIL, USER DOES NOT EXIST")
+                    return client.RC.USER_ERROR
+                elif result == b'\x02':
+                    print("c> LIST_CONTENT FAIL, USER NOT CONNECTED")
+                    return client.RC.USER_ERROR
+                elif result == b'\x03':
+                    print("c> LIST_CONTENT FAIL, REMOTE USER DOES NOT EXIST")
+                    return client.RC.USER_ERROR
+                elif result != b'\x00':
+                    print("c> LIST_CONTENT FAIL")
+                    return client.RC.ERROR
+
+                # Leer datos
+                data = bytearray()
+                while True:
+                    chunk = s.recv(1024)
+                    if not chunk:
+                        break
+                    data += chunk
+
+                entries = data.split(b'\0')
+                if len(entries) < 1:
+                    print("c> LIST_CONTENT FAIL")
+                    return client.RC.ERROR
+
+                count = int(entries[0].decode())
+                print("c> LIST_CONTENT OK")
+                for i in range(1, 1 + count):
+                    print(entries[i].decode())
+
+                return client.RC.OK
+
+        except Exception:
+            print("c> LIST_CONTENT FAIL")
+            return client.RC.ERROR
+
 
     @staticmethod
     def  getfile(user,  remote_FileName,  local_FileName) :
