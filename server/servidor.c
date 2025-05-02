@@ -40,7 +40,7 @@ User* user_list = NULL;
 pthread_mutex_t user_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // ----------------------------
-// FUNCIONES PARA EL MANEJO DE USUARIOS (register, unregister, connect, disconnect)
+// FUNCIONES PARA EL MANEJO DE USUARIOS (register, unregister, connect, disconnect, list_users)
 // ----------------------------
 
 int register_user(const char* name) {
@@ -151,8 +151,32 @@ int disconnect_user(const char* name) {
     return 1; // Usuario no existe
 }
 
+int list_connected_users(char* buffer, int max_len) {
+    pthread_mutex_lock(&user_mutex);
+
+    int pos = 0;
+    User* current = user_list;
+    while (current) {
+        if (current->is_connected) {
+            int name_len = strlen(current->name) + 1;
+            if (pos + name_len >= max_len - 1) {
+                pthread_mutex_unlock(&user_mutex);
+                return -1; // No hay espacio
+            }
+            memcpy(buffer + pos, current->name, name_len);
+            pos += name_len;
+        }
+        current = current->next;
+    }
+
+    buffer[pos++] = '\0'; // Doble \0 final
+    pthread_mutex_unlock(&user_mutex);
+    return pos; // Número de bytes escritos
+}
+
+
 // ----------------------------
-// FUNCIONES PARA LA GESTIÓN DE ARCHIVOS (publish, delete, list_users, list_conect, get_file) <- aunque list_users igual va arriba
+// FUNCIONES PARA LA GESTIÓN DE ARCHIVOS (publish, delete, list_content, get_file)
 // ----------------------------
 
 int publish_file(const char* username, const char* filename, const char* description) {
@@ -301,6 +325,22 @@ void* client_handler(void* arg) {
             printf("s> OPERATION CONNECT FROM %s (%s:%d)\n", user, client_ip, client_port);
         }
 
+    } else if (strcmp(op, "LIST_USERS") == 0) {
+        printf("s> OPERATION LIST_USERS\n");
+        char list_buffer[BUFFER_SIZE];
+        int size = list_connected_users(list_buffer, BUFFER_SIZE);
+
+        if (size < 0) {
+            char fail = 2;
+            send(client_sock, &fail, 1, 0);
+        } else {
+            char ok = 0;
+            send(client_sock, &ok, 1, 0);
+            send(client_sock, list_buffer, size, 0);
+        }
+        close(client_sock);
+        return NULL;
+        
     } else if (strcmp(op, "PUBLISH") == 0) {
         char* filename = strchr(user, '\0') + 1;
         char* description = strchr(filename, '\0') + 1;
@@ -311,7 +351,7 @@ void* client_handler(void* arg) {
             resultado = (char)publish_file(user, filename, description);
             printf("s> OPERATION PUBLISH FROM %s: %s (%s)\n", user, filename, description);
         }
-        
+
     } else if (strcmp(op, "DELETE") == 0) {
     char* filename = strchr(user, '\0') + 1;
 
@@ -332,7 +372,6 @@ void* client_handler(void* arg) {
     close(client_sock);
     return NULL;
 }
-
 
 
 // ----------------------------

@@ -237,9 +237,39 @@ class client :
 
 
     @staticmethod
-    def  listusers() :
-        #  Write your code here
-        return client.RC.ERROR
+    def listusers():
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((client._server, client._port))
+                s.sendall(b"LIST_USERS\0")
+
+                # Primero leemos el código de resultado
+                result = s.recv(1)
+                if result != b'\x00':
+                    print("c> LIST_USERS FAIL")
+                    return client.RC.ERROR
+
+                # Leer datos hasta encontrar doble \0 (por seguridad usamos BUFFER_SIZE)
+                data = bytearray()
+                while True:
+                    chunk = s.recv(1024)
+                    if not chunk:
+                        break
+                    data += chunk
+                    if data[-2:] == b'\0\0':
+                        break
+
+                users = data[:-2].split(b'\0')  # Quitamos el doble \0 final
+                print("c> CONNECTED USERS:")
+                for user in users:
+                    print("   -", user.decode())
+
+                return client.RC.OK
+
+        except Exception as e:
+            print("c> LIST_USERS FAIL")
+            return client.RC.ERROR
+
 
     @staticmethod
     def  listcontent(user) :
