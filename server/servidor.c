@@ -158,13 +158,19 @@ int list_connected_users(char* buffer, int max_len) {
     User* current = user_list;
     while (current) {
         if (current->is_connected) {
-            int name_len = strlen(current->name) + 1;
-            if (pos + name_len >= max_len - 1) {
+            // Formatear la línea: "NOMBRE IP PORT\0"
+            char line[INET_ADDRSTRLEN + MAX_NAME_LEN + 10]; // Suficiente espacio para nombre, IP y puerto
+            int line_len = snprintf(line, sizeof(line), "%s %s %d", current->name, current->ip, current->port);
+            
+            // Verificar si hay espacio en el buffer
+            if (pos + line_len + 1 >= max_len - 1) { // +1 por el \0 adicional
                 pthread_mutex_unlock(&user_mutex);
                 return -1; // No hay espacio
             }
-            memcpy(buffer + pos, current->name, name_len);
-            pos += name_len;
+
+            // Copiar la línea al buffer
+            memcpy(buffer + pos, line, line_len + 1); // +1 para incluir el \0
+            pos += line_len + 1;
         }
         current = current->next;
     }
