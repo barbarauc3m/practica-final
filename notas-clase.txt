@@ -27,7 +27,11 @@ Gestión de archivos:
     LIST_CONTENT: Listar archivos de un usuario
 
     GET_FILE: Descargar archivo de otro cliente (transferencia directa P2P)
+    Flujo de getfile:
+    Solicitud al servidor: el cliente le pide al servidor los datos de IP y puerto del usuario remoto que tiene el archivo.
+    Conexión P2P: una vez obtenidos, se conecta directamente a ese cliente y le pide el archivo usando el comando GET_FILE.
+    Recepción del archivo: si el archivo existe, lo descarga y guarda localmente.
 
 
 
-Me he quedado en list_users. Falla porque solo pasa como parámetro la operación, pero client_handler espera una operación y un usuario. Aún así hay que cambiarlo, porque tengo apuntado que hay que pasar op, username, fecha y hora. 
+Hay que hacer que si se desconecta un cliente inesperadamente (CTRL + C) se haga DISCONNECT !!!!!!!!

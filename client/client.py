@@ -74,6 +74,39 @@ class client :
             print("c> UNREGISTER FAIL")
             return client.RC.ERROR
 
+    @staticmethod
+    def handle_client_request(conn):
+        # Leemos en bucle hasta encontrar el delimitador \0 dos veces (lo que indica que tenemos el comando y el nombre del archivo completo)
+        try:
+            data = bytearray()
+            while b'\0' not in data or data.count(b'\0') < 2:
+                chunk = conn.recv(1024)
+                if not chunk:
+                    break
+                data += chunk
+
+            if data.startswith(b"GET_FILE"):
+                parts = data.split(b'\0')
+                if len(parts) >= 2:
+                    filename = parts[1].decode()
+                    if os.path.exists(filename):
+                        conn.sendall(b'\x00')  # OK
+                        file_size = os.path.getsize(filename)
+                        conn.sendall(str(file_size).encode() + b'\0')
+
+                        with open(filename, 'rb') as f:
+                            while True:
+                                chunk = f.read(4096)
+                                if not chunk:
+                                    break
+                                conn.sendall(chunk)
+                    else:
+                        conn.sendall(b'\x01')  # Archivo no existe
+        except Exception as e:
+            print(f"c> Error al manejar GET_FILE: {e}")
+        finally:
+            conn.close()
+
 
     
     @staticmethod
@@ -89,12 +122,14 @@ class client :
 
             # 2. Crear el hilo que escuchará peticiones (se implementará más adelante)
             def listen():
+                # Hay que modificar el listen porque tienen que escuchar los clientes (para las conexiones P2P, que se conecten a su puerto)
                 while client._running:
                     try:
                         conn, addr = listen_socket.accept()
-                        # Aquí en el futuro se atenderán GET_FILE
-                        conn.close()
-                    except:
+                        client.handle_client_request(conn)
+                        # conn.close()
+                    except Exception as e:
+                        print(f"c> Error en el hilo de escucha: {e}")
                         break
 
             client._listen_thread = threading.Thread(target=listen, daemon=True)
@@ -123,8 +158,6 @@ class client :
         except Exception as e:
             print("c> CONNECT FAIL")
             return client.RC.ERROR
-
-
 
     
     @staticmethod
@@ -343,9 +376,93 @@ class client :
 
 
     @staticmethod
-    def  getfile(user,  remote_FileName,  local_FileName) :
-        #  Write your code here
-        return client.RC.ERROR
+    def getfile(user, remote_fileName, local_fileName):
+        if client._current_user is None:
+            print("c> GET_FILE FAIL, NOT CONNECTED")
+            return client.RC.USER_ERROR
+                
+        try:
+            # Paso 1: Obtener IP y puerto del usuario remoto desde el servidor
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((client._server, client._port))
+                s.sendall(b"GET_FILE\0" + 
+                        client._current_user.encode() + b"\0" +
+                        user.encode() + b"\0" +
+                        remote_fileName.encode() + b"\0")
+                
+                result = s.recv(1)
+                if result == b'\x01':
+                    print("c> GET_FILE FAIL, FILE NOT EXIST")
+                    return client.RC.USER_ERROR
+                elif result != b'\x00':
+                    print("c> GET_FILE FAIL")
+                    return client.RC.ERROR
+
+                # Leer IP y puerto
+                ip = b''
+                while True:
+                    chunk = s.recv(1)
+                    if chunk == b'\0':
+                        break
+                    ip += chunk
+
+                port_str = b''
+                while True:
+                    chunk = s.recv(1)
+                    if chunk == b'\0':
+                        break
+                    port_str += chunk
+
+                ip_addr = ip.decode()
+                port = int(port_str.decode())
+
+            # Paso 2: Conectar con el cliente destino
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                print(f"Ip_addr: {ip_addr}, Port: {port}")
+                s.connect((ip_addr, port))
+                s.sendall(b"GET_FILE\0" + remote_fileName.encode() + b"\0")
+
+                result = s.recv(1)
+                if result == b'\x01':
+                    print("c> GET_FILE FAIL, FILE NOT EXIST")
+                    return client.RC.USER_ERROR
+                elif result != b'\x00':
+                    print("c> GET_FILE FAIL")
+                    return client.RC.ERROR
+
+                # Leer tamaño del archivo
+                size_str = b''
+                while True:
+                    chunk = s.recv(1)
+                    if chunk == b'\0':
+                        break
+                    size_str += chunk
+
+                file_size = int(size_str.decode())
+
+                # Descargar archivo por bloques
+                print("Leido. Ahora a descargar") # A esto no llegaaaaaaaaaaaaaaaaaaaaaaaaa
+                received = 0
+                with open(local_fileName, 'wb') as f:
+                    while received < file_size:
+                        chunk = s.recv(min(4096, file_size - received))
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        received += len(chunk)
+
+                if received == file_size:
+                    print("c> GET_FILE OK")
+                    return client.RC.OK
+                else:
+                    os.remove(local_fileName)
+                    print("c> GET_FILE FAIL (incomplete file)")
+                    return client.RC.ERROR
+
+        except Exception as e:
+            print(f"c> GET_FILE FAIL ({e})")
+            return client.RC.ERROR
+
 
     # *
     # **

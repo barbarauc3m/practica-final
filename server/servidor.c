@@ -327,6 +327,20 @@ int list_user_files(const char* requester, const char* target, char* buffer, int
     return pos; // devuelve bytes escritos si éxito
 }
 
+// Para get_file
+User* get_user_by_name(const char* name) {
+    pthread_mutex_lock(&user_mutex);
+    User* current = user_list;
+    while (current != NULL) {
+        if (strcmp(current->name, name) == 0) {
+            pthread_mutex_unlock(&user_mutex);
+            return current;
+        }
+        current = current->next;
+    }
+    pthread_mutex_unlock(&user_mutex);
+    return NULL;
+}
 
 // ----------------------------
 // Manejo de clientes
@@ -468,14 +482,14 @@ void* client_handler(void* arg) {
         }
 
     } else if (strcmp(op, "DELETE") == 0) {
-    char* filename = strchr(user, '\0') + 1;
+        char* filename = strchr(user, '\0') + 1;
 
-    if (filename >= buffer + len) {
-        resultado = 4; // Mal formato
-    } else {
-        resultado = (char)delete_file(user, filename);
-        printf("s> OPERATION DELETE FROM %s: %s\n", user, filename);
-    }
+        if (filename >= buffer + len) {
+            resultado = 4; // Mal formato
+        } else {
+            resultado = (char)delete_file(user, filename);
+            printf("s> OPERATION DELETE FROM %s: %s\n", user, filename);
+        }
 
     } else if (strcmp(op, "LIST_CONTENT") == 0) {
         char* target_user = strchr(user, '\0') + 1;
@@ -500,11 +514,54 @@ void* client_handler(void* arg) {
 
         close(client_sock);
         return NULL;
+    } else if (strcmp(op, "GET_FILE") == 0) {
+        char* target_user = strchr(user, '\0') + 1;
+        char* filename = strchr(target_user, '\0') + 1;
+        
+        if (filename >= buffer + len) {
+            resultado = 2; // Formato incorrecto
+        } else {
+            User* requester = get_user_by_name(user);
+            User* target = get_user_by_name(target_user);
+            
+            if (!requester || !requester->is_connected) {
+                resultado = 2; // Usuario no existe o no conectado
+            } else if (!target || !target->is_connected) {
+                resultado = 2; // Usuario destino no existe o no conectado
+            } else {
+                // Verificar si el archivo existe en el usuario destino
+                FileEntry* f = target->files;
+                int file_exists = 0;
+                while (f) {
+                    if (strcmp(f->filename, filename) == 0) {
+                        file_exists = 1;
+                        break;
+                    }
+                    f = f->next;
+                }
+                
+                if (file_exists) {
+                    // Enviar información de conexión del usuario destino
+                    resultado = 0; // Éxito
+                    send(client_sock, &resultado, 1, 0);
+                    
+                    // Enviar IP y puerto del usuario destino
+                    send(client_sock, target->ip, strlen(target->ip) + 1, 0);
+                    char port_str[10];
+                    snprintf(port_str, sizeof(port_str), "%d", target->port);
+                    send(client_sock, port_str, strlen(port_str) + 1, 0);
+                    
+                    close(client_sock);
+                    return NULL;
+                } else {
+                    resultado = 1; // Archivo no existe
+                }
+            }
+        }
 
-
-    } else {
-        printf("s> UNKNOWN OPERATION: %s\n", op);
-        resultado = 3;
+        } else {
+            printf("s> UNKNOWN OPERATION: %s\n", op);
+            resultado = 3;
     }
 
     // Enviar respuesta y cerrar
