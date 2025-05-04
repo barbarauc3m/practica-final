@@ -418,7 +418,7 @@ class client :
 
             # Paso 2: Conectar con el cliente destino
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                print(f"Ip_addr: {ip_addr}, Port: {port}")
+                #print(f"Ip_addr: {ip_addr}, Port: {port}")
                 s.connect((ip_addr, port))
                 s.sendall(b"GET_FILE\0" + remote_fileName.encode() + b"\0")
 
@@ -441,7 +441,7 @@ class client :
                 file_size = int(size_str.decode())
 
                 # Descargar archivo por bloques
-                print("Leido. Ahora a descargar") # A esto no llegaaaaaaaaaaaaaaaaaaaaaaaaa
+                print("Leido. Ahora a descargar")
                 received = 0
                 with open(local_fileName, 'wb') as f:
                     while received < file_size:

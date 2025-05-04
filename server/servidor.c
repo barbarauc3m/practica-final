@@ -515,9 +515,9 @@ void* client_handler(void* arg) {
         close(client_sock);
         return NULL;
     } else if (strcmp(op, "GET_FILE") == 0) {
-        char* target_user = strchr(user, '\0') + 1;
-        char* filename = strchr(target_user, '\0') + 1;
-        
+        char* target_user = strchr(user, '\0') + 1; // Coge target_user como todo lo que hay detrás del primer \0
+        char* filename = strchr(target_user, '\0') + 1;  // Coge filename como lo que hay detras del \0 en target_user (o sea el segundo \0)
+
         if (filename >= buffer + len) {
             resultado = 2; // Formato incorrecto
         } else {
