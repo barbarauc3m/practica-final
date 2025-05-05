@@ -9,15 +9,13 @@
 bool_t
 log_action_1_svc(log_action_args arg1, void *result,  struct svc_req *rqstp)
 {
-	/* Imprime: Nombre_usuario OPERACION [<fichero>]  dd/mm/yyyy hh:mm:ss */
-    printf("%s %s %s\n",
-		arg1.user,
-		arg1.operation,
-		arg1.timestamp);
-	fflush(stdout);
-	*(bool_t *)result = TRUE;
-    return TRUE;
+	bool_t retval;
 
+	/*
+	 * insert server code here
+	 */
+
+	return retval;
 }
 
 int
