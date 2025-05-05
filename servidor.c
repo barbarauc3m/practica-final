@@ -362,6 +362,8 @@ void* client_handler(void* arg) {
     // Parsear operación y usuario
     char* op = buffer;
     char* user = strchr(op, '\0') + 1;
+    char* timestamp = strchr(user, '\0') + 1;
+
 
     // Verificación del formato básico
     if (user >= buffer + len) {
@@ -372,23 +374,34 @@ void* client_handler(void* arg) {
         return NULL;
     }
 
+    if (timestamp >= buffer + len) {
+        printf("s> Invalid message format\n");
+        char resultado = 2;
+        send(client_sock, &resultado, 1, 0);
+        close(client_sock);
+        return NULL;
+    }
+    
+
     char resultado = 2; // Valor por defecto: error
 
     printf("s> op='%s' | user='%s'\n", op, user);
     if (strcmp(op, "REGISTER") == 0) {
         resultado = (char)register_user(user);
-        printf("s> OPERATION REGISTER FROM %s\n", user);
+        printf("s> OPERATION REGISTER FROM %s at %s\n", user, timestamp);
 
     } else if (strcmp(op, "UNREGISTER") == 0) {
         resultado = (char)unregister_user(user);
-        printf("s> OPERATION UNREGISTER FROM %s\n", user);
+        printf("s> OPERATION UNREGISTER FROM %s at %s\n", user, timestamp);
 
     } else if (strcmp(op, "DISCONNECT") == 0) {
         resultado = (char)disconnect_user(user);
-        printf("s> OPERATION DISCONNECT FROM %s\n", user);
+        printf("s> OPERATION DISCONNECT FROM %s at %s\n", user, timestamp);
 
     } else if (strcmp(op, "CONNECT") == 0) {
         char* port_str = strchr(user, '\0') + 1;
+        char* timestamp = strchr(port_str, '\0') + 1; 
+
         if (port_str >= buffer + len) {
             resultado = 3;
         } else {
@@ -402,11 +415,11 @@ void* client_handler(void* arg) {
             inet_ntop(AF_INET, &addr.sin_addr, client_ip, INET_ADDRSTRLEN);
 
             resultado = (char)connect_user(user, client_ip, client_port);
-            printf("s> OPERATION CONNECT FROM %s (%s:%d)\n", user, client_ip, client_port);
+            printf("s> OPERATION CONNECT FROM %s (%s:%d) at %s\n", user, client_ip, client_port, timestamp);
         }
 
     } else if (strcmp(op, "LIST_USERS") == 0) {
-        printf("s> OPERATION LIST_USERS FROM %s\n", user);
+        printf("s> OPERATION LIST_USERS FROM %s at %s\n", user, timestamp);
 
         pthread_mutex_lock(&user_mutex);
         User* requester = user_list;
@@ -473,26 +486,29 @@ void* client_handler(void* arg) {
     } else if (strcmp(op, "PUBLISH") == 0) {
         char* filename = strchr(user, '\0') + 1;
         char* description = strchr(filename, '\0') + 1;
+        char* timestamp = strchr(description, '\0') + 1;
 
         if (description >= buffer + len) {
             resultado = 4;
         } else {
             resultado = (char)publish_file(user, filename, description);
-            printf("s> OPERATION PUBLISH FROM %s: %s (%s)\n", user, filename, description);
+            printf("s> OPERATION PUBLISH FROM %s: %s (%s) at %s\n", user, filename, description, timestamp);
         }
 
     } else if (strcmp(op, "DELETE") == 0) {
         char* filename = strchr(user, '\0') + 1;
+        char* timestamp = strchr(filename, '\0') + 1;
 
         if (filename >= buffer + len) {
             resultado = 4; // Mal formato
         } else {
             resultado = (char)delete_file(user, filename);
-            printf("s> OPERATION DELETE FROM %s: %s\n", user, filename);
+            printf("s> OPERATION DELETE FROM %s: %s at %s\n", user, filename, timestamp);
         }
 
     } else if (strcmp(op, "LIST_CONTENT") == 0) {
         char* target_user = strchr(user, '\0') + 1;
+        char* timestamp = strchr(target_user, '\0') + 1;
         if (target_user >= buffer + len) {
             char code = 4;
             send(client_sock, &code, 1, 0);
@@ -511,12 +527,15 @@ void* client_handler(void* arg) {
             char err_code = (char)result;
             send(client_sock, &err_code, 1, 0);
         }
+        printf("s> OPERATION LIST_CONTENT FROM %s TO %s at %s\n", user, target_user, timestamp);
+
 
         close(client_sock);
         return NULL;
     } else if (strcmp(op, "GET_FILE") == 0) {
         char* target_user = strchr(user, '\0') + 1; // Coge target_user como todo lo que hay detrás del primer \0
         char* filename = strchr(target_user, '\0') + 1;  // Coge filename como lo que hay detras del \0 en target_user (o sea el segundo \0)
+        char* timestamp = strchr(filename, '\0') + 1;
 
         if (filename >= buffer + len) {
             resultado = 2; // Formato incorrecto
@@ -557,10 +576,12 @@ void* client_handler(void* arg) {
                     resultado = 1; // Archivo no existe
                 }
             }
+            printf("s> OPERATION GET_FILE FROM %s TO %s: %s at %s\n", user, target_user, filename, timestamp);
+
         }
 
         } else {
-            printf("s> UNKNOWN OPERATION: %s\n", op);
+            printf("s> UNKNOWN OPERATION: %s at %s\n", op, timestamp);
             resultado = 3;
     }
 
