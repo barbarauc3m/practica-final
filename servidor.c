@@ -1,5 +1,6 @@
 /*
-gcc servidor.c -o servidor -lpthread
+gcc servidor.c -o servidor -lpthread // ESTE NO
+gcc -Wall -g     servidor.c     log_rpc_clnt.c log_rpc_xdr.c     -o servidor     -I/usr/include/tirpc     -lpthread -ltirpc
 ./servidor -p 5000
 */
 
@@ -391,8 +392,30 @@ void* client_handler(void* arg) {
     char resultado = 2; // Valor por defecto: error
 
      // Prepara args para RPC
-     struct log_action_args args;
      char operation_str[512];
+
+    /* 1) Construyo los args */
+    struct log_action_args args;
+    args.user      = (char*)user;
+    args.operation = (char*)operation_str;
+    args.timestamp = (char*)timestamp;
+
+    /* 2) Defino el timeout en una variable (sin coma al final) */
+    struct timeval timeout = { 5, 0 };
+
+    /* 3) Invoco la macro con 7 args EXACTOS */
+    enum clnt_stat st = clnt_call(
+    log_clnt,                       /* CLIENT * */
+        LOG_ACTION,                      /* procedimiento */
+        (xdrproc_t)xdr_log_action_args, /* xdr args */
+        (caddr_t)&args,                 /* puntero args */
+        (xdrproc_t)xdr_bool,            /* xdr result */
+        (caddr_t)&resultado,            /* puntero result */
+        timeout                         /* struct timeval */
+    );
+    if (st != RPC_SUCCESS) {
+        clnt_perror(log_clnt, "Error en RPC LOGACTION");
+    }
 
     printf("s> op='%s' | user='%s'\n", op, user);
 
