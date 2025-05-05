@@ -11,6 +11,10 @@ gcc servidor.c -o servidor -lpthread
 #include <pthread.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <tirpc/rpc/rpc.h>
+#include "log_rpc.h"
+
+
 
 // ----------------------------
 // Constantes y estructuras
@@ -37,6 +41,8 @@ typedef struct User {
 } User;
 
 User* user_list = NULL;
+CLIENT *log_clnt = NULL;
+
 pthread_mutex_t user_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // ----------------------------
@@ -381,22 +387,32 @@ void* client_handler(void* arg) {
         close(client_sock);
         return NULL;
     }
-    
 
     char resultado = 2; // Valor por defecto: error
 
+     // Prepara args para RPC
+     struct log_action_args args;
+     char operation_str[512];
+
     printf("s> op='%s' | user='%s'\n", op, user);
+
     if (strcmp(op, "REGISTER") == 0) {
         resultado = (char)register_user(user);
         printf("s> OPERATION REGISTER FROM %s at %s\n", user, timestamp);
+
+        strcpy(operation_str, "REGISTER");
 
     } else if (strcmp(op, "UNREGISTER") == 0) {
         resultado = (char)unregister_user(user);
         printf("s> OPERATION UNREGISTER FROM %s at %s\n", user, timestamp);
 
+        strcpy(operation_str, "UNREGISTER");
+
     } else if (strcmp(op, "DISCONNECT") == 0) {
         resultado = (char)disconnect_user(user);
         printf("s> OPERATION DISCONNECT FROM %s at %s\n", user, timestamp);
+
+        strcpy(operation_str, "DISCONNECT");
 
     } else if (strcmp(op, "CONNECT") == 0) {
         char* port_str = strchr(user, '\0') + 1;
@@ -409,6 +425,7 @@ void* client_handler(void* arg) {
 
             struct sockaddr_in addr;
             socklen_t addr_len = sizeof(addr);
+
             getpeername(client_sock, (struct sockaddr*)&addr, &addr_len);
 
             char client_ip[INET_ADDRSTRLEN];
@@ -416,6 +433,8 @@ void* client_handler(void* arg) {
 
             resultado = (char)connect_user(user, client_ip, client_port);
             printf("s> OPERATION CONNECT FROM %s (%s:%d) at %s\n", user, client_ip, client_port, timestamp);
+
+            strcpy(operation_str, "CONNECT");
         }
 
     } else if (strcmp(op, "LIST_USERS") == 0) {
@@ -478,6 +497,8 @@ void* client_handler(void* arg) {
             u = u->next;
         }
 
+        strcpy(operation_str, "LIST USERS");
+
         pthread_mutex_unlock(&user_mutex);
         close(client_sock);
         return NULL;
@@ -493,6 +514,8 @@ void* client_handler(void* arg) {
         } else {
             resultado = (char)publish_file(user, filename, description);
             printf("s> OPERATION PUBLISH FROM %s: %s (%s) at %s\n", user, filename, description, timestamp);
+
+            snprintf(operation_str, sizeof(operation_str),"PUBLISH %s", filename);
         }
 
     } else if (strcmp(op, "DELETE") == 0) {
@@ -504,6 +527,7 @@ void* client_handler(void* arg) {
         } else {
             resultado = (char)delete_file(user, filename);
             printf("s> OPERATION DELETE FROM %s: %s at %s\n", user, filename, timestamp);
+            snprintf(operation_str, sizeof(operation_str), "DELETE %s", filename);
         }
 
     } else if (strcmp(op, "LIST_CONTENT") == 0) {
@@ -529,9 +553,11 @@ void* client_handler(void* arg) {
         }
         printf("s> OPERATION LIST_CONTENT FROM %s TO %s at %s\n", user, target_user, timestamp);
 
+        strcpy(operation_str, "LIST CONTENT");
 
         close(client_sock);
         return NULL;
+
     } else if (strcmp(op, "GET_FILE") == 0) {
         char* target_user = strchr(user, '\0') + 1; // Coge target_user como todo lo que hay detrás del primer \0
         char* filename = strchr(target_user, '\0') + 1;  // Coge filename como lo que hay detras del \0 en target_user (o sea el segundo \0)
@@ -578,6 +604,7 @@ void* client_handler(void* arg) {
             }
             printf("s> OPERATION GET_FILE FROM %s TO %s: %s at %s\n", user, target_user, filename, timestamp);
 
+            snprintf(operation_str, sizeof(operation_str), "GET_FILE %s", filename);
         }
 
         } else {
@@ -633,6 +660,20 @@ int main(int argc, char* argv[]) {
     }
 
     printf("s> init server 127.0.0.1:%d\ns>\n", port);
+
+    /* 1) Leer la IP del servidor RPC desde la variable de entorno */
+    char *rpc_host = getenv("LOG_RPC_IP");
+    if (!rpc_host) {
+        fprintf(stderr, "ERROR: tienes que exportar LOG_RPC_IP\n");
+        exit(1);
+    }
+
+    /* 2) Crear cliente RPC sobre TCP */
+    log_clnt = clnt_create(rpc_host, LOGPROG, LOGVERS, "tcp");
+    if (log_clnt == NULL) {
+        clnt_pcreateerror("Error conectando al servidor RPC");
+        exit(1);
+    }
 
     while (1) {
         struct sockaddr_in client_addr;
