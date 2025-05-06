@@ -9,4 +9,4 @@ program LOGPROG {
     version LOGVERS {
         void LOG_ACTION(log_action_args) = 1;
     } = 1;
-} = 0x20000001;
+} = 100495755;

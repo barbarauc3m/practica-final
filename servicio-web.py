@@ -1,16 +1,14 @@
-# python3 servicio-web.py
+# sudo apt install python3-fastapi
 
-from flask import Flask
+from fastapi import FastAPI
 from datetime import datetime
 
-app = Flask(__name__)
+app = FastAPI()
 
-@app.route("/datetime", methods=["GET"])
-def get_datetime():
+@app.get("/datetime")
+async def get_datetime():
     now = datetime.now()
-    formatted = now.strftime("%d/%m/%Y %H:%M:%S")
-    return formatted
+    return {"datetime": now.strftime("%d/%m/%Y %H:%M:%S")}
 
-if __name__ == "__main__":
-    # Lo ejecutamos en localhost:8000 (puedes cambiar el puerto si lo necesitas)
-    app.run(host="127.0.0.1", port=8000)
+# Para arrancar:
+#    uvicorn servicio-web:app --host 127.0.0.1 --port 8000 --reload
