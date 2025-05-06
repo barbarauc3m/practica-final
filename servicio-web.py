@@ -1,4 +1,6 @@
 # sudo apt install python3-fastapi
+# sudo apt install uvicorn
+
 
 from fastapi import FastAPI
 from datetime import datetime
