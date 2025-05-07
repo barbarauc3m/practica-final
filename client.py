@@ -141,9 +141,8 @@ class client :
             client._listen_port = listen_socket.getsockname()[1]
             client._current_user = user
 
-            # 2. Crear el hilo que escuchará peticiones (se implementará más adelante)
+            # 2. Crear el hilo que escuchará peticiones
             def listen():
-                # Hay que modificar el listen porque tienen que escuchar los clientes (para las conexiones P2P, que se conecten a su puerto)
                 while client._running:
                     try:
                         conn, addr = listen_socket.accept()

@@ -393,17 +393,37 @@ void* client_handler(void* arg) {
 
      // Prepara args para RPC
      char operation_str[512];
+     memset(operation_str, 0, sizeof(operation_str));  // Limpiamos el buffer
 
-    /* 1) Construyo los args */
+    // 1) Asignamos el nombre de la operación ANTES de la llamada RPC
+    if (strcmp(op, "REGISTER") == 0) {
+        strncpy(operation_str, "REGISTER", sizeof(operation_str));
+    } else if (strcmp(op, "UNREGISTER") == 0) {
+        strncpy(operation_str, "UNREGISTER", sizeof(operation_str));
+    } else if (strcmp(op, "CONNECT") == 0) {
+        strncpy(operation_str, "CONNECT", sizeof(operation_str));
+    } else if (strcmp(op, "DISCONNECT") == 0) {
+        strncpy(operation_str, "DISCONNECT", sizeof(operation_str));
+    } else if (strcmp(op, "PUBLISH") == 0) {
+        strncpy(operation_str, "PUBLISH", sizeof(operation_str));
+    } else if (strcmp(op, "DELETE") == 0) {
+        strncpy(operation_str, "DELETE", sizeof(operation_str));
+    } else if (strcmp(op, "LIST_USERS") == 0) {
+        strncpy(operation_str, "LIST_USERS", sizeof(operation_str));
+    } else if (strcmp(op, "LIST_CONTENT") == 0) {
+        strncpy(operation_str, "LIST_CONTENT", sizeof(operation_str));
+    }
+
+    // 2) Construimos los args 
     struct log_action_args args;
     args.user      = (char*)user;
-    args.operation = (char*)operation_str;
+    args.operation = operation_str;
     args.timestamp = (char*)timestamp;
 
-    /* 2) Defino el timeout en una variable (sin coma al final) */
+    /* 3) Defino el timeout en una variable (sin coma al final) */
     struct timeval timeout = { 5, 0 };
 
-    /* 3) Invoco la macro con 7 args EXACTOS */
+    /* 4) Invocamos la macro con 7 args EXACTOS */
     enum clnt_stat st = clnt_call(
     log_clnt,                       /* CLIENT * */
         LOG_ACTION,                      /* procedimiento */
