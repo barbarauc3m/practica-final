@@ -369,7 +369,6 @@ void* client_handler(void* arg) {
     // Parsear operación y usuario
     char* op = buffer;
     char* user = strchr(op, '\0') + 1;
-    //char* timestamp = strchr(user, '\0') + 1;
 
     // Manejo de timestamp
     char *timestamp;
@@ -433,9 +432,16 @@ void* client_handler(void* arg) {
     } else if (strcmp(op, "DISCONNECT") == 0) {
         strncpy(operation_str, "DISCONNECT", sizeof(operation_str));
     } else if (strcmp(op, "PUBLISH") == 0) {
-        strncpy(operation_str, "PUBLISH", sizeof(operation_str));
+        char *filename = strchr(user, '\0') + 1;
+        char *description = strchr(filename, '\0') + 1;
+        timestamp = strchr(description, '\0') + 1;
+        // Formato: "PUBLISH filename"
+        snprintf(operation_str, sizeof(operation_str), "PUBLISH %s", filename);
     } else if (strcmp(op, "DELETE") == 0) {
-        strncpy(operation_str, "DELETE", sizeof(operation_str));
+        char *filename = strchr(user, '\0') + 1;
+        timestamp = strchr(filename, '\0') + 1;        
+        // Formato: "DELETE filename"
+        snprintf(operation_str, sizeof(operation_str), "DELETE %s", filename);
     } else if (strcmp(op, "LIST_USERS") == 0) {
         strncpy(operation_str, "LIST_USERS", sizeof(operation_str));
     } else if (strcmp(op, "LIST_CONTENT") == 0) {

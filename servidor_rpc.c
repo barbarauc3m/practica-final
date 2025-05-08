@@ -10,7 +10,7 @@ bool_t
 log_action_1_svc(log_action_args arg1, void *result,  struct svc_req *rqstp)
 {
 	/* Imprime: Nombre_usuario OPERACION [<fichero>]  dd/mm/yyyy hh:mm:ss */
-	/*
+	
     printf("%s %s %s\n",
 		arg1.user,
 		arg1.operation,
@@ -18,21 +18,6 @@ log_action_1_svc(log_action_args arg1, void *result,  struct svc_req *rqstp)
 	fflush(stdout);
 	*(bool_t *)result = TRUE;
     return TRUE;
-	*/
-	/* Debug: Verifica longitudes de cadenas recibidas */
-    printf("\n--- Debug RPC Server ---\n");
-    printf("User length: %zu\n", strlen(arg1.user));
-    printf("Operation length: %zu\n", strlen(arg1.operation));
-    printf("Timestamp length: %zu\n", strlen(arg1.timestamp));
-    printf("\n-----------------------\n");
-
-    /* Imprime normal */
-    printf("Formatted output: %s %s %s\n", arg1.user, arg1.operation, arg1.timestamp);
-    fflush(stdout);
-    
-    *(bool_t *)result = TRUE;
-    return TRUE;
-
 }
 
 int
