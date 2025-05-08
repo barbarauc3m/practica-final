@@ -369,8 +369,37 @@ void* client_handler(void* arg) {
     // Parsear operación y usuario
     char* op = buffer;
     char* user = strchr(op, '\0') + 1;
-    char* timestamp = strchr(user, '\0') + 1;
+    //char* timestamp = strchr(user, '\0') + 1;
 
+    // Manejo de timestamp
+    char *timestamp;
+    
+    if (strcmp(op, "CONNECT") == 0) {
+        char *port_str = strchr(user, '\0') + 1;
+        timestamp = strchr(port_str, '\0') + 1;
+    } 
+    else if (strcmp(op, "PUBLISH") == 0) {
+        char *filename = strchr(user, '\0') + 1;
+        char *description = strchr(filename, '\0') + 1;
+        timestamp = strchr(description, '\0') + 1;
+    }
+    else if (strcmp(op, "DELETE") == 0) {
+        char *filename = strchr(user, '\0') + 1;
+        timestamp = strchr(filename, '\0') + 1;
+    }
+    else if (strcmp(op, "LIST_CONTENT") == 0) {
+        char *target_user = strchr(user, '\0') + 1;
+        timestamp = strchr(target_user, '\0') + 1;
+    }
+    else if (strcmp(op, "GET_FILE") == 0) {
+        char *target_user = strchr(user, '\0') + 1;
+        char *filename = strchr(target_user, '\0') + 1;
+        timestamp = strchr(filename, '\0') + 1;
+    }
+    else {
+        // Operaciones simples: REGISTER, UNREGISTER, DISCONNECT, LIST_USERS
+        timestamp = strchr(user, '\0') + 1;
+    }
 
     // Verificación del formato básico
     if (user >= buffer + len) {
@@ -380,7 +409,6 @@ void* client_handler(void* arg) {
         close(client_sock);
         return NULL;
     }
-
     if (timestamp >= buffer + len) {
         printf("s> Invalid message format\n");
         char resultado = 2;
