@@ -95,7 +95,7 @@ class client :
     def handle_client_request(conn):
         # Leemos en bucle hasta encontrar el delimitador \0 dos veces (lo que indica que tenemos el comando y el nombre del archivo completo)
         try:
-            timestamp = get_datetime_from_web()
+            # timestamp = get_datetime_from_web()
 
             data = bytearray()
             while b'\0' not in data or data.count(b'\0') < 2:
@@ -111,8 +111,13 @@ class client :
                     if os.path.exists(filename):
                         conn.sendall(b'\x00')  # OK
                         file_size = os.path.getsize(filename)
-                        conn.sendall(str(file_size).encode() + b'\0' + timestamp.encode() + b"\0")
+                        timestamp = get_datetime_from_web()
 
+                        # Enviar encabezado separado por '\0' (file_size\0timestamp\0)
+                        header = f"{file_size}\0{timestamp}\0".encode()
+                        conn.sendall(header)
+
+                        # Enviar archivo
                         with open(filename, 'rb') as f:
                             while True:
                                 chunk = f.read(4096)
@@ -121,6 +126,7 @@ class client :
                                 conn.sendall(chunk)
                     else:
                         conn.sendall(b'\x01')  # Archivo no existe
+
         except Exception as e:
             print(f"c> Error al manejar GET_FILE: {e}")
         finally:
@@ -470,10 +476,19 @@ class client :
                         break
                     size_str += chunk
 
+                # Leer timestamp
+                timestamp_str = b''
+                while True:
+                    chunk = s.recv(1)
+                    if chunk == b'\0':
+                        break
+                    timestamp_str += chunk
+
                 file_size = int(size_str.decode())
+                timestamp = timestamp_str.decode()
+                print(f"Archivo de {file_size} bytes. Timestamp: {timestamp}")
 
                 # Descargar archivo por bloques
-                print("Leido. Ahora a descargar")
                 received = 0
                 with open(local_fileName, 'wb') as f:
                     while received < file_size:
@@ -482,6 +497,7 @@ class client :
                             break
                         f.write(chunk)
                         received += len(chunk)
+
 
                 if received == file_size:
                     print("c> GET_FILE OK")
