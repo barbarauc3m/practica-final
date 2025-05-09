@@ -442,6 +442,8 @@ void* client_handler(void* arg) {
         timestamp = strchr(filename, '\0') + 1;        
         // Formato: "DELETE filename"
         snprintf(operation_str, sizeof(operation_str), "DELETE %s", filename);
+    } else if (strcmp(op, "GET_FILE") == 0) {
+        strncpy(operation_str, "GET_FILE", sizeof(operation_str));
     } else if (strcmp(op, "LIST_USERS") == 0) {
         strncpy(operation_str, "LIST_USERS", sizeof(operation_str));
     } else if (strcmp(op, "LIST_CONTENT") == 0) {

@@ -486,7 +486,6 @@ class client :
 
                 file_size = int(size_str.decode())
                 timestamp = timestamp_str.decode()
-                print(f"Archivo de {file_size} bytes. Timestamp: {timestamp}")
 
                 # Descargar archivo por bloques
                 received = 0
