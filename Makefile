@@ -14,7 +14,7 @@ SOCK_SRC     = servidor.c
 SOCK_BIN     = servidor
 
 # -------------------------------------------------------------------
-# Detecta tu servidor‐RPC (servidor-rpc.c ó servidor_rpc.c)
+# Detectar servidor_rpc.c 
 # -------------------------------------------------------------------
 RPC_SRC      := $(firstword $(wildcard servidor-rpc.c servidor_rpc.c))
 RPC_BIN      := $(RPC_SRC:.c=)
