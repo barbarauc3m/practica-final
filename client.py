@@ -10,12 +10,12 @@ import requests
 
 def get_datetime_from_web():
     try:
-        response = requests.get("http://127.0.0.1:8000/datetime", timeout=2)
-        response.raise_for_status()
-        data = response.json()
-        # 'datetime' es la clave que devuelve FastAPI
-        return data.get("datetime", "00/00/0000 00:00:00")
-    except Exception:
+        response = requests.get("http://127.0.0.1:8000/datetime")
+        if response.status_code == 200:
+            return response.text
+        else:
+            return "00/00/0000 00:00:00"
+    except Exception as e:
         return "00/00/0000 00:00:00"
 
 
