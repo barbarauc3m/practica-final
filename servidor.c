@@ -659,6 +659,7 @@ void* client_handler(void* arg) {
                 
                 if (file_exists) {
                     // Enviar información de conexión del usuario destino
+                    printf("s> OPERATION GET_FILE FROM %s TO %s: %s at %s\n", user, target_user, filename, timestamp);
                     resultado = 0; // Éxito
                     send(client_sock, &resultado, 1, 0);
                     
