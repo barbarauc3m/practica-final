@@ -463,9 +463,6 @@ void* client_handler(void* arg) {
         (caddr_t)&resultado,            /* puntero result */
         timeout                         /* struct timeval */
     );
-    if (st != RPC_SUCCESS) {
-        clnt_perror(log_clnt, "Error en RPC LOGACTION");
-    }
 
     printf("s> op='%s' | user='%s'\n", op, user);
 
