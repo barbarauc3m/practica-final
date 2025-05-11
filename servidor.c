@@ -1,10 +1,3 @@
-/*
-gcc servidor.c -o servidor -lpthread // ESTE NO
-gcc -Wall -g     servidor.c     log_rpc_clnt.c log_rpc_xdr.c     -o servidor     -I/usr/include/tirpc     -lpthread -ltirpc
-./servidor -p 5000
-*/
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,23 +19,23 @@ gcc -Wall -g     servidor.c     log_rpc_clnt.c log_rpc_xdr.c     -o servidor    
 #define BUFFER_SIZE 1024
 
 typedef struct FileEntry {
-    char filename[256];
-    char description[256];
-    struct FileEntry* next;
+    char filename[256];       // Nombre del archivo
+    char description[256];    // Descripción del archivo
+    struct FileEntry* next;   // Puntero al siguiente archivo (lista enlazada)
 } FileEntry;
 
 
 typedef struct User {
-    char name[MAX_NAME_LEN];
-    int is_connected;
-    char ip[INET_ADDRSTRLEN];
-    int port;
-    FileEntry* files; // Nuevo campo (lista enlazada) para los archivos publicados por el usuario
-    struct User* next;
+    char name[MAX_NAME_LEN];   // Nombre del usuario
+    int is_connected;          // Flag de conexión (1=conectado, 0=desconectado)
+    char ip[INET_ADDRSTRLEN];  // Dirección IP del usuario
+    int port;                  // Puerto de conexión del usuario
+    FileEntry* files;          // Lista enlazada para los archivos publicados por el usuario
+    struct User* next;         // Puntero al siguiente usuario (lista enlazada)
 } User;
 
-User* user_list = NULL;
-CLIENT *log_clnt = NULL;
+User* user_list = NULL;   // Lista global de usuarios registrados
+CLIENT *log_clnt = NULL; // Cliente RPC para logging
 
 pthread_mutex_t user_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -63,14 +56,14 @@ int register_user(const char* name) {
         current = current->next;
     }
 
-    // Crear nuevo nodo
+    // Para crear nuevo nodo (usuario)
     User* new_user = malloc(sizeof(User));
     if (!new_user) {
         pthread_mutex_unlock(&user_mutex);
         return 2; // Error
     }
 
-    // INICIALIZAMOS BIEN TODOS LOS CAMPOS
+    // Inicializamos todos los campos del usuario
     strncpy(new_user->name, name, MAX_NAME_LEN);
     new_user->is_connected = 0;
     new_user->ip[0] = '\0';
@@ -354,25 +347,26 @@ User* get_user_by_name(const char* name) {
 // ----------------------------
 
 void* client_handler(void* arg) {
+    // 1. Obtener socket del cliente y liberar memoria del argumento
     int client_sock = *(int*)arg;
     free(arg);
 
+    // 2. Recibir datos del cliente
     char buffer[BUFFER_SIZE];
     int len = recv(client_sock, buffer, BUFFER_SIZE, 0);
     if (len <= 0) {
         close(client_sock);
         return NULL;
     }
+    buffer[len] = '\0';  // Le añadimos \0 al final de la cadena
 
-    buffer[len] = '\0';
-
-    // Parsear operación y usuario
+    // 3. Parsear operación y usuario
     char* op = buffer;
     char* user = strchr(op, '\0') + 1;
 
-    // Manejo de timestamp
+    // 4. Manejo de timestamp
     char *timestamp;
-    
+
     if (strcmp(op, "CONNECT") == 0) {
         char *port_str = strchr(user, '\0') + 1;
         timestamp = strchr(port_str, '\0') + 1;
@@ -400,7 +394,7 @@ void* client_handler(void* arg) {
         timestamp = strchr(user, '\0') + 1;
     }
 
-    // Verificación del formato básico
+    // 5. Verificación del formato básico
     if (user >= buffer + len) {
         printf("s> Invalid message format\n");
         char resultado = 2;
@@ -418,11 +412,11 @@ void* client_handler(void* arg) {
 
     char resultado = 2; // Valor por defecto: error
 
-     // Prepara args para RPC
+     // 6. Preparar args para RPC
      char operation_str[512];
      memset(operation_str, 0, sizeof(operation_str));  // Limpiamos el buffer
 
-    // 1) Asignamos el nombre de la operación ANTES de la llamada RPC
+    //// Asignamos el nombre de la operación ANTES de la llamada RPC
     if (strcmp(op, "REGISTER") == 0) {
         strncpy(operation_str, "REGISTER", sizeof(operation_str));
     } else if (strcmp(op, "UNREGISTER") == 0) {
@@ -450,16 +444,16 @@ void* client_handler(void* arg) {
         strncpy(operation_str, "LIST_CONTENT", sizeof(operation_str));
     }
 
-    // 2) Construimos los args 
+    //// Construimos los args 
     struct log_action_args args;
     args.user      = (char*)user;
     args.operation = operation_str;
     args.timestamp = (char*)timestamp;
 
-    /* 3) Defino el timeout en una variable (sin coma al final) */
+    //// Definimos el timeout en una variable (sin coma al final)
     struct timeval timeout = { 5, 0 };
 
-    /* 4) Invocamos la macro con 7 args EXACTOS */
+    //// Invocamos la macro con 7 args EXACTOS
     enum clnt_stat st = clnt_call(
     log_clnt,                       /* CLIENT * */
         LOG_ACTION,                      /* procedimiento */
@@ -475,6 +469,8 @@ void* client_handler(void* arg) {
 
     printf("s> op='%s' | user='%s'\n", op, user);
 
+
+    // 7. Procesar cada tipo de operación
     if (strcmp(op, "REGISTER") == 0) {
         resultado = (char)register_user(user);
         printf("s> OPERATION REGISTER FROM %s at %s\n", user, timestamp);
@@ -691,7 +687,7 @@ void* client_handler(void* arg) {
             resultado = 3;
     }
 
-    // Enviar respuesta y cerrar
+    // 8. Enviar respuesta al cliente y cerrar
     send(client_sock, &resultado, 1, 0);
     close(client_sock);
     return NULL;
